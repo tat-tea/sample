@@ -1,29 +1,31 @@
-<build>
-    <plugins>
-        <!-- その他のプラグイン... -->
+# dot_to_puml.py
+import re
+import sys
 
-        <plugin>
-            <artifactId>maven-assembly-plugin</artifactId>
-            <version>3.3.0</version>
-            <configuration>
-                <archive>
-                    <manifest>
-                        <mainClass>com.yourpackage.YourMainClass</mainClass>
-                    </manifest>
-                </archive>
-                <descriptorRefs>
-                    <descriptorRef>jar-with-dependencies</descriptorRef>
-                </descriptorRefs>
-            </configuration>
-            <executions>
-                <execution>
-                    <id>make-assembly</id>
-                    <phase>package</phase>
-                    <goals>
-                        <goal>single</goal>
-                    </goals>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
-</build>
+def convert_dot_to_plantuml(dot_content):
+    # ヘッダーとフッターを削除
+    dot_content = re.sub(r'digraph ".*" {', '', dot_content)
+    dot_content = dot_content.replace('}', '').strip()
+
+    # 依存関係を変換
+    relations = re.findall(r'"(.*?)" -> "(.*?)";', dot_content)
+
+    # PlantUML形式で返す
+    puml_content = "@startuml\n"
+    for relation in relations:
+        puml_content += f"{relation[0]} --> {relation[1]}\n"
+    puml_content += "@enduml\n"
+
+    return puml_content
+
+if __name__ == "__main__":
+    dot_filename = sys.argv[1]
+    puml_filename = sys.argv[2]
+
+    with open(dot_filename, 'r') as f:
+        dot_content = f.read()
+
+    puml_content = convert_dot_to_plantuml(dot_content)
+
+    with open(puml_filename, 'w') as f:
+        f.write(puml_content)
