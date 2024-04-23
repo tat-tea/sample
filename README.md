@@ -1,6 +1,43 @@
-```
-echo "deb [signed-by=/usr/share/keyrings/wsl-translinux.gpg] https://wsl-translinux.arkane-systems.net/apt/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/wsl-translinux.list
-curl -s https://wsl-translinux.arkane-systems.net/apt/wsl-translinux.gpg | gpg --dearmor | sudo tee /usr/share/keyrings/wsl-translinux.gpg >/dev/null
-sudo apt update
-sudo apt install -y systemd-genie
-```
+version: '3.8'
+
+services:
+  jenkins:
+    image: jenkins/jenkins:2.190.2
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+    networks:
+      - net
+
+  pgpool:
+    image: bitnami/pgpool:latest
+    environment:
+      - PGPOOL_BACKEND_NODES=0:postgres:5432
+      - PGPOOL_POSTGRES_USERNAME=postgres
+      - PGPOOL_POSTGRES_PASSWORD=postgres_password
+      - PGPOOL_ADMIN_USERNAME=admin
+      - PGPOOL_ADMIN_PASSWORD=admin_password
+    ports:
+      - "9999:9999"
+    depends_on:
+      - postgres
+    networks:
+      - net
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_PASSWORD: postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - net
+
+volumes:
+  jenkins_data:
+  postgres_data:
+
+networks:
+  net:
