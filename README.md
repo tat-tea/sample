@@ -1,84 +1,69 @@
-MicroStackにオーケストレーション機能、特にOpenStackのオーケストレーションサービスであるHeatを追加するには、いくつかのステップが必要です。ただし、MicroStackは主に簡易的なテストやデモンストレーション用途に使われるため、全てのOpenStackコンポーネントがプリインストールされているわけではありません。Heatのようなオーケストレーション機能は、デフォルトでは含まれていません。
+MicroStackにHeatオーケストレーションサービスを追加してHorizon Dashboardで確認するには、いくつかのステップが必要です。ただし、MicroStackは通常、限られたOpenStackコンポーネントのみをサポートしており、Heatのような追加サービスは標準のセットアップに含まれていないことに注意してください。以下に、HeatをMicroStack環境に統合してHorizon Dashboardで利用するための概要を説明します。
 
-以下は、MicroStackにHeatを統合するための基本的な手順です。これは高度な設定が必要であり、OpenStackのインスタンス内部での作業が伴います：
+### ステップ 1: 必要なパッケージのインストール
+UbuntuなどのLinuxディストリビューションにHeat関連のパッケージをインストールします。
 
-1. **Heatのインストール**: UbuntuサーバーにHeatをインストールするため、まずは必要なパッケージを取得します。以下のコマンドを実行してHeat関連のコンポーネントをインストールします：
-   ```bash
-   sudo apt update
-   sudo apt install heat-api heat-api-cfn heat-engine
-   ```
+```bash
+sudo apt update
+sudo apt install heat-api heat-api-cfn heat-engine python3-heatclient
+```
 
-2. **データベースの設定**: Heatはデータベースを使用して情報を格納します。MySQLまたはMariaDBが使われることが多いです。MicroStackではデフォルトでSQLiteが使われることが多いので、MySQLに変更する場合は、MySQLにHeatのデータベースとユーザーを設定する必要があります。
+### ステップ 2: Heatの設定
+Heatサービスの設定ファイル`/etc/heat/heat.conf`を編集して、適切に設定します。主にKeystoneとの連携や、RabbitMQ、データベース設定が含まれます。
 
-3. **Heatの設定**: `/etc/heat/heat.conf` ファイルを編集し、Keystoneとの接続情報、RabbitMQ（メッセージブローカー）、データベース設定などを更新します。
+```ini
+[DEFAULT]
+...
+heat_metadata_server_url = http://localhost:8000
+heat_waitcondition_server_url = http://localhost:8000/v1/waitcondition
 
-4. **サービスの登録とエンドポイントの作成**: KeystoneにHeatサービスを登録し、適切なAPIエンドポイントを作成します。これには、以下のようなコマンドを使用します：
-   ```bash
-   openstack service create --name heat --description "Orchestration" orchestration
-   openstack service create --name heat-cfn --description "Orchestration CloudFormation" cloudformation
-   openstack endpoint create --region RegionOne orchestration public http://<your-ip>:8004/v1/%\(tenant_id\)s
-   openstack endpoint create --region RegionOne cloudformation public http://<your-ip>:8000/v1
-   ```
+[database]
+connection = mysql+pymysql://heat:HEAT_DBPASS@localhost/heat
 
-Heatの主要コンポーネントであるHeat API、Heat API for AWS CloudFormation（heat-api-cfn）、およびHeat Engineのサービスを起動するためのコマンドは、Ubuntuやその他のLinuxディストリビューションで一般的に使用されるsystemdを使います。以下は、これらのサービスを起動し、自動起動を設定するための一連のコマンドです。
+[keystone_authtoken]
+www_authenticate_uri = http://localhost:5000/v3
+auth_url = http://localhost:5000
+memcached_servers = localhost:11211
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+project_name = service
+username = heat
+password = HEAT_PASS
 
-### Heat サービスの起動
+[trustee]
+auth_type = password
+auth_url = http://localhost:5000
+username = heat
+password = HEAT_PASS
+user_domain_name = default
+```
 
-1. **Heat APIの起動**
-   ```bash
-   sudo systemctl start heat-api
-   ```
+### ステップ 3: データベースとKeystoneの設定
+Heat用のデータベースを作成し、KeystoneにHeatサービスとエンドポイントを登録します。
 
-2. **Heat API for CloudFormationの起動**
-   ```bash
-   sudo systemctl start heat-api-cfn
-   ```
+```bash
+# Heatデータベースの作成
+mysql -u root -p -e "CREATE DATABASE heat; GRANT ALL PRIVILEGES ON heat.* TO 'heat'@'localhost' IDENTIFIED BY 'HEAT_DBPASS';"
 
-3. **Heat Engineの起動**
-   ```bash
-   sudo systemctl start heat-engine
-   ```
+# Keystoneのサービスエンドポイントの登録
+openstack user create --domain default --password HEAT_PASS heat
+openstack role add --project service --user heat admin
+openstack service create --name heat --description "Orchestration" orchestration
+openstack service create --name heat-cfn --description "Orchestration CloudFormation" cloudformation
+openstack endpoint create --region RegionOne orchestration public http://localhost:8004/v1/%\(tenant_id\)s
+openstack endpoint create --region RegionOne cloudformation public http://localhost:8000/v1
+```
 
-### サービスの自動起動設定
+### ステップ 4: Heatサービスの起動
+Heat関連のサービスを起動し、自動起動を設定します。
 
-各サービスがシステムの起動時に自動的に起動するように設定します。
+```bash
+sudo systemctl start heat-api heat-api-cfn heat-engine
+sudo systemctl enable heat-api heat-api-cfn heat-engine
+```
 
-1. **Heat APIの自動起動設定**
-   ```bash
-   sudo systemctl enable heat-api
-   ```
+### ステップ 5: Horizon Dashboardの確認
+Heatが正しく設定され、Horizon Dashboardに表示されるようになったか確認します。エラーがあれば、ログを確認し、設定を見直してください。
 
-2. **Heat API for CloudFormationの自動起動設定**
-   ```bash
-   sudo systemctl enable heat-api-cfn
-   ```
-
-3. **Heat Engineの自動起動設定**
-   ```bash
-   sudo systemctl enable heat-engine
-   ```
-
-### ステータス確認
-
-各サービスが正常に起動しているかを確認するためには、以下のコマンドを使用します。
-
-1. **Heat APIのステータス確認**
-   ```bash
-   sudo systemctl status heat-api
-   ```
-
-2. **Heat API for CloudFormationのステータス確認**
-   ```bash
-   sudo systemctl status heat-api-cfn
-   ```
-
-3. **Heat Engineのステータス確認**
-   ```bash
-   sudo systemctl status heat-engine
-   ```
-
-これらのコマンドを実行することで、Heatの各サービスを管理し、問題がある場合はログをチェックしてトラブルシューティングを行うことができます。また、何かエラーが発生している場合は、エラーメッセージを確認し、設定が正しく行われているかを再確認する必要があります。
-
-6. **テスト**: Heatが正しく設定されているかをテストするために、Heatテンプレートを使ってスタックを作成し試みます。
-
-このプロセスは複雑であり、OpenStackの深い理解を必要とします。また、MicroStackと統合する際には特有の課題が発生することがあります。正式なサポートやコミュニティのガイダンスを受けながら進めることをお勧めします。
+これでMicroStack環境にHeatを統合し、Horizon Dashboardから管理する基本的な手順を設定できます。ただし、このプロセスは高度な技術知識を要求し、設定の正確性が非常に重要です。デバッグが必要な場合は、ログファイルやOpenStackコミュニティのサポートを活用してください。
