@@ -92,3 +92,67 @@ MySQL 8.0以降でユーザーを作成し、権限を付与する正しい手�
    ```
 
 この手順に従って、ローカルとリモートの両方からアクセスできる`heat`ユーザーに対して適切な権限が設定されます。もし使用しているMySQLのバージョンが8.0未満である場合は、使用しているバージョンを確認し、適切な構文でコマンドを実行してください。
+
+
+Ubuntu上で自己署名SSL証明書を作成し、それを用いてHeat-APIをSSL通信で動作させる手順を詳しく説明します。自己署名証明書は、開発やテスト環境での使用に適していますが、公開されている本番環境では、信頼できる認証局（CA）から取得した証明書を使用することをお勧めします。
+
+### 1. 自己署名証明書の作成
+まずは、自己署名証明書と秘密鍵を生成します。
+
+1. **必要なツールのインストール**:
+   ```bash
+   sudo apt update
+   sudo apt install openssl
+   ```
+
+2. **秘密鍵の生成**:
+   ```bash
+   openssl genrsa -out server.key 2048
+   ```
+
+3. **証明書署名要求（CSR）の作成**:
+   ```bash
+   openssl req -new -key server.key -out server.csr
+   ```
+   このステップではいくつかの質問に答えます。"Common Name"（一般名）には、サーバのドメイン名またはIPアドレスを入力します。自己署名証明書の場合、ここに適切な値（例えば "localhost"）を入力することが重要です。
+
+4. **自己署名証明書の生成**:
+   ```bash
+   openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
+   ```
+
+### 2. 証明書のインストールと設定
+
+1. **証明書と秘密鍵を適切な場所に移動**:
+   ```bash
+   sudo cp server.crt /etc/ssl/certs/
+   sudo cp server.key /etc/ssl/private/
+   ```
+
+2. **Heat-APIのSSL設定**:
+   Heatの設定ファイル（通常は `/etc/heat/heat.conf`）を編集して、以下のセクションを追加または変更します。
+   ```ini
+   [ssl]
+   cert_file = /etc/ssl/certs/server.crt
+   key_file = /etc/ssl/private/server.key
+   ca_file = /etc/ssl/certs/ca-certificates.crt
+   enable = True
+   ```
+
+### 3. Heat-APIサービスの再起動
+設定を適用するためにHeat-APIサービスを再起動します。
+```bash
+sudo systemctl restart heat-api
+```
+
+### 4. SSL証明書の信頼設定
+クライアントがこの自己署名証明書を信頼するように設定する必要があります。クライアント（またはブラウザ）に証明書をインストールするか、接続時に証明書の検証をスキップするように設定します。
+
+### 5. 接続テスト
+設定が正しく行われたかをテストするために、curlなどのツールを使用してHTTPS接続を試みます。
+```bash
+curl -k https://localhost:8004/v1/YOUR_PROJECT_ID/stacks
+```
+ここで `-k` オプションはcurlに対し、SSL証明書の検証を無視させます。本番環境では使用しないでください。
+
+以上の手順に従って、Ubuntu上で自己署名SSL証明書を作成し、Heat-APIをSSL通信で使用する設定を行うことができます。
