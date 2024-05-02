@@ -70,24 +70,25 @@ Heatが正しく設定され、Horizon Dashboardに表示されるようにな�
 
 
 
-MySQLでの権限付与のSQL文には少し問題があるようです。`IDENTIFIED BY`句は、`GRANT`文ではMySQL 8.0以降ではサポートされていません。ユーザーの作成とパスワードの設定は`CREATE USER`文を使って行う必要があります。
+MySQLで権限を付与する際に発生しているエラーについて対処する方法をお話しします。まず、提供されたコマンドは古いバージョンのMySQLで使われた構文ですが、MySQL 8.0以降では`IDENTIFIED BY`を使用することができません。`GRANT`コマンドとユーザーのパスワード設定を分ける必要があります。
 
-まず、次のようにユーザーを作成するためのSQL文を実行してください：
+MySQL 8.0以降でユーザーを作成し、権限を付与する正しい手順は以下の通りです：
 
-```sql
-CREATE USER 'heat'@'localhost' IDENTIFIED BY 'HEAT_DBPASS';
-```
+1. **ユーザー作成**:
+   ```sql
+   CREATE USER 'heat'@'localhost' IDENTIFIED BY 'HEAT_DBPASS';
+   CREATE USER 'heat'@'%' IDENTIFIED BY 'HEAT_DBPASS';
+   ```
 
-その後、ユーザーにデータベース `heat` への全権限を付与するためには、次の`GRANT`文を使用します：
+2. **権限付与**:
+   ```sql
+   GRANT ALL PRIVILEGES ON heat.* TO 'heat'@'localhost';
+   GRANT ALL PRIVILEGES ON heat.* TO 'heat'@'%';
+   ```
 
-```sql
-GRANT ALL PRIVILEGES ON heat.* TO 'heat'@'localhost';
-```
+3. **権限の更新を適用**:
+   ```sql
+   FLUSH PRIVILEGES;
+   ```
 
-これで、ユーザー `heat` に対して必要な権限が設定されるはずです。変更を有効にするために、最後に以下を実行してください：
-
-```sql
-FLUSH PRIVILEGES;
-```
-
-これで問題が解決するはずですが、それでもエラーが発生する場合は、エラーメッセージの詳細を教えてください。それに基づいてさらにアドバイスを提供できます。
+この手順に従って、ローカルとリモートの両方からアクセスできる`heat`ユーザーに対して適切な権限が設定されます。もし使用しているMySQLのバージョンが8.0未満である場合は、使用しているバージョンを確認し、適切な構文でコマンドを実行してください。
