@@ -67,3 +67,27 @@ sudo systemctl enable heat-api heat-api-cfn heat-engine
 Heatが正しく設定され、Horizon Dashboardに表示されるようになったか確認します。エラーがあれば、ログを確認し、設定を見直してください。
 
 これでMicroStack環境にHeatを統合し、Horizon Dashboardから管理する基本的な手順を設定できます。ただし、このプロセスは高度な技術知識を要求し、設定の正確性が非常に重要です。デバッグが必要な場合は、ログファイルやOpenStackコミュニティのサポートを活用してください。
+
+
+
+MySQLでの権限付与のSQL文には少し問題があるようです。`IDENTIFIED BY`句は、`GRANT`文ではMySQL 8.0以降ではサポートされていません。ユーザーの作成とパスワードの設定は`CREATE USER`文を使って行う必要があります。
+
+まず、次のようにユーザーを作成するためのSQL文を実行してください：
+
+```sql
+CREATE USER 'heat'@'localhost' IDENTIFIED BY 'HEAT_DBPASS';
+```
+
+その後、ユーザーにデータベース `heat` への全権限を付与するためには、次の`GRANT`文を使用します：
+
+```sql
+GRANT ALL PRIVILEGES ON heat.* TO 'heat'@'localhost';
+```
+
+これで、ユーザー `heat` に対して必要な権限が設定されるはずです。変更を有効にするために、最後に以下を実行してください：
+
+```sql
+FLUSH PRIVILEGES;
+```
+
+これで問題が解決するはずですが、それでもエラーが発生する場合は、エラーメッセージの詳細を教えてください。それに基づいてさらにアドバイスを提供できます。
