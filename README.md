@@ -1,4 +1,4 @@
-
+```
 sourceSets {
     main {
         java {
@@ -22,3 +22,5 @@ war {
     }
     archiveFileName = 'myapp.war'
 }
+
+```
