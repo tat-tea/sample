@@ -15,7 +15,8 @@ repositories {
 }
 
 dependencies {
-    // 必要に応じて依存関係を追加
+    // Jakarta EE 10の依存関係を追加
+    providedCompile 'jakarta.platform:jakarta.jakartaee-api:10.0.0'
     implementation files('../../REST_AP/WebContent/lib/fw.jar')
 }
 
@@ -53,5 +54,4 @@ task copyResources(type: Copy) {
 
 processResources.dependsOn copyResources
 classes.dependsOn copyLibs
-
 ```
