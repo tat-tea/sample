@@ -1,57 +1,42 @@
-```
-plugins {
-    id 'java'
-    id 'war'
-}
+3. Docker のインストール
+WSL 2 上で systemd を使って Docker を管理するために、以下の手順で Docker をインストールします。
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-}
+リポジトリと GPG 鍵の追加:
 
-repositories {
-    mavenCentral()
-}
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+Docker リポジトリの設定:
 
-dependencies {
-    // Jakarta EE 10の依存関係を追加
-    providedCompile 'jakarta.platform:jakarta.jakartaee-api:10.0.0'
-    implementation files('../../REST_AP/WebContent/lib/fw.jar')
-}
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+Docker のインストール:
 
-war {
-    archiveFileName = 'alarm.war'
-    destinationDirectory = file('../war')
-    from '../../REST_AP/WebContent'
-}
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+4. Docker を sudo なしで実行できるように設定
+docker グループを作成する:
 
-sourceSets {
-    main {
-        java {
-            srcDirs = ['../../REST_AP/src']
-        }
-        resources {
-            srcDirs = ['../../REST_AP/WebContent/classes']
-        }
-    }
-}
+sudo groupadd docker
+現在のユーザーを docker グループに追加する:
 
-task copyLibs(type: Copy) {
-    from('../../REST_AP/WebContent/lib') {
-        include 'fw.jar'
-    }
-    into("$buildDir/classes/java/main/lib")
-}
+sudo usermod -aG docker $USER
+変更を反映するために、WSL セッションを再起動する:
 
-task copyResources(type: Copy) {
-    from('../../REST_AP/WebContent/classes') {
-        include 'log4j2.xml'
-        include 'message.properties'
-    }
-    into("$buildDir/resources/main")
-}
+exit
+その後、再度 WSL にログインします。
 
-processResources.dependsOn copyResources
-classes.dependsOn copyLibs
-```
+5. Docker サービスの開始と有効化
+Docker デーモンを起動し、自動起動を設定します。
+
+Docker の起動:
+
+sudo systemctl start docker
+Docker の自動起動設定:
+
+sudo systemctl enable docker
+6. 動作確認
+Docker コマンドの実行 (sudo なし):
+
+docker --version
+docker run hello-world
